@@ -1,0 +1,278 @@
+---
+title: "Hypothesis 3"
+author: "Ahsan Bilal"
+date: "2024-04-14"
+output: html_document
+---
+We start by clearing our workspace and loading the necessary libraries followed by importing the dataset.
+```{r}
+rm(list = ls())
+
+if (!require(tidyverse)) install.packages("tidyverse")
+library(tidyverse)
+
+if (!require(lubridate)) install.packages("lubridate")
+library(lubridate)
+```
+
+```{r}
+bike_store <- read.csv("BikeStore_ADS.csv")
+view(bike_store)
+str(bike_store)
+```
+
+The ADS dataset has 2000 rows and 22 columns. We will first do the data manipulation and variable selection that is part of the cleaning process. Having only the relevant columns will make our further analysis much more convenient.
+
+
+The three date columns need to be converted to the right data type. Since we have to create a seasons column, it would be useful to extract just the month from the dates.
+```{r}
+bike_store$Order_Date <- as.Date(bike_store$Order_Date)
+bike_store$Order_Year <- year(bike_store$Order_Date)
+bike_store$Order_Month <- month(bike_store$Order_Date)
+
+
+bike_store$Required_Date <- as.Date(bike_store$Required_Date)
+bike_store$Required_Year <- year(bike_store$Required_Date)
+bike_store$Required_Month <- month(bike_store$Required_Date)
+
+bike_store$Shipped_Date <- as.Date(bike_store$Shipped_Date)
+bike_store$Shipped_Year <- year(bike_store$Shipped_Date)
+bike_store$Shipped_Month <- month(bike_store$Shipped_Date)
+```
+
+We check the unique values from the created month columns to ensure the possible values are only from 1-12.
+```{r}
+unique(bike_store$Order_Month)
+unique(bike_store$Required_Month)
+unique(bike_store$Shipped_Month)
+
+unique(bike_store$Order_Year)
+unique(bike_store$Required_Year)
+unique(bike_store$Shipped_Year)
+```
+
+
+We have discovered some NA values which is a problem. We need to first get rid of them before proceeding further.
+```{r}
+bike_store_no_na <- bike_store %>%
+  na.omit(bike_store)
+```
+
+We have discovered that the records are heavily skewed towards the year 2016. There are very few records containing the year 2017. So to eliminate bias in our analysis, we will filter our dataset so it only has 2016 sales data.
+```{r}
+bike_store_clean <- bike_store_no_na %>%
+  filter(Order_Year != 2017 & Shipped_Year != 2017 & Required_Year != 2017)
+```
+
+Now we will use conditionals to create a Seasons column based on the month of the year.
+```{r}
+bike_store_clean$Seasons <- ifelse(
+  bike_store_clean$Order_Month %in% c(12,1,2), "Winter",
+  
+  ifelse(
+    bike_store_clean$Order_Month %in% c(3,4,5), "Spring",
+    
+    ifelse(
+      bike_store_clean$Order_Month %in% c(6,7,8), "Summer",
+      
+      ifelse(
+        bike_store_clean$Order_Month %in% c(9,10,11), "Fall", NA
+      ))))
+```
+
+It's time to do final clean up by only selecting the important columns that will be part of our modeling process.
+```{r}
+df <- bike_store_clean %>%
+  select(Customer_ID, Order_ID, Brand_ID, Brand_Name, Category_Name, List_Price, Discount, Quantity, Seasons)
+
+
+head(df)
+```
+
+Before getting into modeling, it would be helpful to conduct some descriptive analytics. To measure customer responsiveness, we can look at the quantity ordered column. It is a binary variable containing only two values, 1 and 2. So a value of 2 means a customer ordering an additional unit of bicycle instead of only 1 unit. 
+
+We can check how these patterns differ with different prices, different seasons and brands of bicycles.
+
+In the code chunk below, some new variables are created which will be part of the modeling process.
+
+```{r}
+df_model <- df %>%
+  mutate(Extra_Unit_Order = ifelse(Quantity == 2, 1, 0)) %>%
+  mutate(Ideal_Segment = ifelse(Seasons == "Summer" 
+                                & Brand_Name == "Electra"
+                                & Category_Name == "Cruisers Bikes",
+                                1, 0)) %>%
+  mutate(Discounted_Price = List_Price * (1 - Discount)) %>%
+  mutate(Revenue = Discounted_Price * Quantity)
+
+
+
+avg_price_and_orders_count <- df_model %>%
+  group_by(Seasons) %>%
+  summarize(Average_Price = mean(List_Price),
+            Number_of_Orders = n())
+ 
+
+avg_price_and_orders_count
+
+```
+From the table above, we can see that the highest average list price is in the summer season and the most orders are also made in the same season.
+
+
+We can use dplyr to group the amount of customers who purchase an additional unit based on season, brand and product category.
+```{r}
+avg_price_vector <- c(915.45, 996.69, 1014.60, 953.83)
+num_orders_vector <- c(104, 212, 235, 110)
+seasons_vector <- c("Fall", "Spring", "Summer", "Winter")
+
+
+extra_order_by_season <- df_model %>%
+  group_by(Seasons) %>%
+  count(Extra_Unit_Order)
+
+extra_order_by_brand <- df_model %>%
+  group_by(Brand_Name) %>%
+  count(Extra_Unit_Order)
+
+
+extra_order_by_category <- df_model %>%
+  group_by(Category_Name) %>%
+  count(Extra_Unit_Order)
+
+```
+
+
+We can use bar charts as a way to visualize customer responsiveness based on the seasons, the brand and the product category. The x-axis will have the specific category and the y-axis will show the count of customers who order an extra unit of bicycle.
+```{r}
+seasons_vector_1 = c("Summer", "Spring", "Winter", "Fall")
+Extra_Order_Count_Season = c(120, 117, 60, 46)
+
+jpeg(file="3_1_1.jpeg")
+bar_plot_extra_order_season <- barplot(
+    Extra_Order_Count_Season, 
+    main = "Extra Unit Order Count by Season",
+    #names.arg = segments,
+    xlab = "Seasons",
+    ylab = "Count of Extra Unit Order",
+    col = c("orange", "green", "yellow", "purple"),
+    legend.text = seasons_vector_1,
+    space = 0.5
+    )
+dev.off()
+
+
+Brand_vector <- c("Electra", "Trek", "Surly", "Pure Cycles", "Heller", "Ritchey", "Sun Bicycles", "Haro")
+Extra_Order_Count_Brand <- c(165, 59, 46, 36, 13, 11, 10, 3)
+
+jpeg(file="3_1_2.jpeg")
+bar_plot_extra_order_brand <- barplot(
+    Extra_Order_Count_Brand, 
+    main = "Extra Unit Order Count by Brand",
+    #names.arg = segments,
+    xlab = "Brand Name",
+    ylab = "Count of Extra Unit Order",
+    col = c("orange", 
+            "green", 
+            "yellow", 
+            "purple", 
+            "red",
+            "brown", 
+            "pink", 
+            "blue"),
+    legend.text = Brand_vector,
+    space = 0.5
+    )
+dev.off()
+
+
+Category_vector <- c("Cruisers", "Mountain", "Children", "Comfort", "Cyclocross", "Electric", "Road")
+Extra_Order_Count_Cat <- c(113, 86, 52, 49, 25, 13, 5)
+
+jpeg(file="3_2_1.jpeg")
+bar_plot_extra_order_cat <- barplot(
+    Extra_Order_Count_Cat, 
+    main = "Extra Unit Order Count by Category",
+    #names.arg = segments,
+    xlab = "Category Name",
+    ylab = "Count of Extra Unit Order",
+    col = c("orange", 
+            "green", 
+            "yellow", 
+            "purple", 
+            "red",
+            "brown", 
+            "blue"),
+    legend.text = Category_vector,
+    space = 0.5
+    )
+dev.off()
+```
+From the bar plots, we can conclude that: 
+ * Most customers purchase an additional unit of bicycle during the summer season in 2016.
+ 
+ * Most customers purchase an additional unit of bicycle for the Electra Brand in 2016.
+ 
+  * Most customers purchase an additional unit of bicycle for the Cruiser Bikes product category in 2016.
+  
+To make our models simple to interpret, we will put all these customers into one segment and the segment will be used as a predictor. In the code chunk, line 100, the variable named 'Ideal Segment' has been created based on the condition that the extra unit bought is during summer, is of the Electra Brand and of the Cruiser Bikes category.
+
+```{r}
+view(df_model)
+
+```
+
+
+*3.1: How do consumers respond to price changes within different brands during different seasons?*
+
+*3.2: Are there seasonal trends in consumer preferences for specific brands within the same product category?*
+
+
+We can use regression models to provide further insights for 3.1 and 3.2.
+
+## LINEAR REGRESSION MODEL 1
+
+```{r}
+rev_model_brand <- lm(Revenue ~ List_Price + Brand_Name + Seasons,
+                data = df_model)
+summary(rev_model_brand)
+```
+The R-squared value for the model is 0.8163 which is good. However, the only significant variable at the 0.05 level is List_Price. This is logical because the response variables, Revenue is derived from the List Price. 
+
+Unfortunately, the seasons and the brands are not good predictors for the revenue that is generated as a result of customer purchase.
+
+
+## LINEAR REGRESSION MODEL 2
+```{r}
+rev_model_category <- lm(Revenue ~ List_Price + Category_Name + Seasons,
+                data = df_model)
+summary(rev_model_category)
+```
+Linear regression model 2 has an R-squared value of 0.8171. However, once again, list price is the only good predictor. Product category variable coefficients have a very high p-value. 
+
+
+## LOGISTIC REGRESSION MODEL
+
+We can build a logisitic regression model to predict the probability of a customer from our ideal segment ordering an extra unit of bicycle.
+
+As a reminder, the ideal segment is a customer who satisfies the following conditions:
+
+* The order is made during Summer.
+* The order is for the Electra Brand.
+* The order is for the Cruiser Bikes category.
+```{r}
+logistic <- glm(Extra_Unit_Order ~ Ideal_Segment + List_Price,
+                data = df_model,
+                family = "binomial")
+
+summary(logistic)
+```
+Our logistic regression model also does not show any significant coefficients. 
+
+
+
+
+
+
+
+
+
