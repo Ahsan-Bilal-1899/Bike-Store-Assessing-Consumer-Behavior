@@ -8,6 +8,10 @@ This work is my part of the contribution to the overall group project of one of 
 * How do consumers respond to price changes within different brands during different seasons? 
 * Are there seasonal trends in consumer preferences for specific brands within the same product category? 
 
+## Group Collaboration and Personal Contribution
+The overall group project report can be viewed by accessing this [link.](https://drive.google.com/file/d/1QbkGxSsLVb2MotpvtLGChXC1HewcoN1Z/view?usp=sharing)
+My contribution was my work on tackling Hypothesis #3. The research questions I investigated are described in the heading above. 
+
 ## Dataset
 The Bikestore dataset that has been used for this project is in .xlsx format and can be accessed by visiting this [link.](https://www.dropbox.com/scl/fi/qeryxtbnwie2trhw254qa/BikeStore_ADS-1.xlsx?rlkey=9nrd55mhpkg8l5pmmjkizcjuh&dl=0)
 
